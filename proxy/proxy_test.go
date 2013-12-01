@@ -1,6 +1,7 @@
 package proxy_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	. "github.com/onsi/ginkgo"
@@ -66,7 +67,23 @@ var _ = Describe("Proxy", func() {
 			Expect(err).To(BeNil())
 
 			jsonData := jsonResponse.(map[string]interface{})
-			Expect(jsonData["cassette"]).To(BeNil())
+			Expect(jsonData["cassette"]).To(Equal(""))
 		})
+
+		It("allows setting the current cassette via POST", func() {
+			resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort), "text/json", bytes.NewBufferString("{\"cassette\": \"test-cassette\"}"))
+			Expect(err).To(BeNil())
+
+			resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort))
+			Expect(err).To(BeNil())
+
+			var jsonResponse map[string]interface{}
+			body, _ := ioutil.ReadAll(resp.Body)
+			err = json.Unmarshal(body, &jsonResponse)
+			Expect(err).To(BeNil())
+
+			Expect(jsonResponse["cassette"]).To(Equal("test-cassette"))
+		})
+
 	})
 })
