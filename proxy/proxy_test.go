@@ -85,7 +85,7 @@ var _ = Describe("Proxy", func() {
 	})
 
 	Context("records and plays back proxied responses", func() {
-		It("replays responses when a cassette is set", func() {
+		It("replays GETs when a cassette is set", func() {
 			resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort), "text/json", bytes.NewBufferString("{\"cassette\": \"test-cassette\"}"))
 			Expect(err).To(BeNil())
 
@@ -102,10 +102,16 @@ var _ = Describe("Proxy", func() {
 			Expect(err).To(BeNil())
 			Expect(resp.StatusCode).To(Equal(200))
 			Expect(string(body)).To(Equal("hello, world"))
-
 		})
+
+		PIt("replays POSTs when a cassette is set", func() {})
+		PIt("differentiates requests with different bodies", func() {})
+		PIt("differentiates requests with different methods", func() {})
+		PIt("differentiates requests with different headers", func() {})
 		PIt("records nothing without a current cassette", func() {})
 		PIt("denies unrecorded responses when the option is set", func() {})
+		PIt("write cassettes to disk", func() {})
+		PIt("replays from cassettes on disk", func() {})
 	})
 
 })
