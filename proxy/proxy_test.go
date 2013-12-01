@@ -61,13 +61,12 @@ var _ = Describe("Proxy", func() {
 			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort))
 			Expect(err).To(BeNil())
 
-			var jsonResponse interface{}
+			var jsonResponse map[string]interface{}
 			body, _ := ioutil.ReadAll(resp.Body)
 			err = json.Unmarshal(body, &jsonResponse)
 			Expect(err).To(BeNil())
 
-			jsonData := jsonResponse.(map[string]interface{})
-			Expect(jsonData["cassette"]).To(Equal(""))
+			Expect(jsonResponse["cassette"]).To(Equal(""))
 		})
 
 		It("allows setting the current cassette via POST", func() {
