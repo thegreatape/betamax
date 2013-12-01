@@ -11,33 +11,32 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 )
 
 var _ = Describe("Proxy", func() {
 	var proxy http.Handler
-	var targetListener net.Listener
-	var targetPort string
+	var targetServer *httptest.Server
+
 	var proxyListener net.Listener
 	var proxyPort string
 
 	BeforeEach(func() {
-		targetListener, _ = net.Listen("tcp", "0.0.0.0:0")
-		_, targetPort, _ = net.SplitHostPort(targetListener.Addr().String())
 		proxyListener, _ = net.Listen("tcp", "0.0.0.0:0")
 		_, proxyPort, _ = net.SplitHostPort(proxyListener.Addr().String())
 
-		go http.Serve(targetListener, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		targetServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			io.WriteString(writer, "hello, world")
 		}))
 
-		targetUrl, _ := url.Parse(fmt.Sprintf("http://127.0.0.1:%s/", targetPort))
+		targetUrl, _ := url.Parse(targetServer.URL)
 		proxy = Proxy(targetUrl)
 		go http.Serve(proxyListener, proxy)
 	})
 
 	AfterEach(func() {
-		targetListener.Close()
+		targetServer.Close()
 		proxyListener.Close()
 	})
 
@@ -50,7 +49,7 @@ var _ = Describe("Proxy", func() {
 	})
 
 	It("returns a 500 if the target server is down", func() {
-		targetListener.Close()
+		targetServer.Close()
 		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
 		Expect(err).To(BeNil())
 		Expect(resp.StatusCode).To(Equal(500))
@@ -83,6 +82,30 @@ var _ = Describe("Proxy", func() {
 
 			Expect(jsonResponse["cassette"]).To(Equal("test-cassette"))
 		})
-
 	})
+
+	Context("records and plays back proxied responses", func() {
+		It("replays responses when a cassette is set", func() {
+			resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort), "text/json", bytes.NewBufferString("{\"cassette\": \"test-cassette\"}"))
+			Expect(err).To(BeNil())
+
+			resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(err).To(BeNil())
+			Expect(resp.StatusCode).To(Equal(200))
+			Expect(string(body)).To(Equal("hello, world"))
+
+			targetServer.Close()
+
+			resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(err).To(BeNil())
+			Expect(resp.StatusCode).To(Equal(200))
+			Expect(string(body)).To(Equal("hello, world"))
+
+		})
+		PIt("records nothing without a current cassette", func() {})
+		PIt("denies unrecorded responses when the option is set", func() {})
+	})
+
 })
