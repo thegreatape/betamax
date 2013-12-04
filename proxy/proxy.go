@@ -2,14 +2,26 @@ package proxy
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"path"
 )
 
 type Config struct {
-	Cassette string `json:"cassette"`
-	Episodes []Episode
+	CassetteDir string
+	Cassette    string `json:"cassette"`
+	Episodes    []Episode
+}
+
+func (c *Config) Save() error {
+	jsonData, err := json.Marshal(&c.Episodes)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(path.Join(c.CassetteDir, c.Cassette+".json"), jsonData, 0700)
 }
 
 type Cassette struct {
@@ -70,6 +82,11 @@ func configHandler(handler http.Handler, config *Config) http.Handler {
 
 func cassetteHandler(handler http.Handler, config *Config) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		if config.Cassette == "" {
+			handler.ServeHTTP(resp, req)
+			return
+		}
+
 		if episode := findEpisode(req, config); episode != nil {
 			serveEpisode(episode, resp)
 		} else {
@@ -105,11 +122,9 @@ func serveAndRecord(resp http.ResponseWriter, req *http.Request, handler http.Ha
 }
 
 func writeEpisode(episode Episode, config *Config) {
-	//jsonData, err := json.Marshal(&episode)
-	//fmt.Println(err)
-	//fmt.Println(string(jsonData))
 
 	config.Episodes = append(config.Episodes, episode)
+	config.Save()
 }
 
 func findEpisode(req *http.Request, config *Config) *Episode {
@@ -132,8 +147,10 @@ func serveEpisode(episode *Episode, resp http.ResponseWriter) {
 	resp.Write(episode.Response.Body)
 }
 
-func Proxy(target *url.URL) http.Handler {
-	config := new(Config)
+func Proxy(target *url.URL, cassetteDir string) http.Handler {
+	config := &Config{CassetteDir: cassetteDir}
+	os.MkdirAll(cassetteDir, 0700)
+
 	configHandler := configHandler(httputil.NewSingleHostReverseProxy(target), config)
 	return cassetteHandler(configHandler, config)
 }

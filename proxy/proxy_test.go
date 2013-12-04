@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path"
 )
 
 var _ = Describe("Proxy", func() {
@@ -21,6 +23,7 @@ var _ = Describe("Proxy", func() {
 
 	var proxyListener net.Listener
 	var proxyPort string
+	var cassetteDir string
 
 	BeforeEach(func() {
 		proxyListener, _ = net.Listen("tcp", "0.0.0.0:0")
@@ -31,7 +34,8 @@ var _ = Describe("Proxy", func() {
 		}))
 
 		targetUrl, _ := url.Parse(targetServer.URL)
-		proxy = Proxy(targetUrl)
+		cassetteDir = path.Join(os.TempDir(), "cassettes")
+		proxy = Proxy(targetUrl, cassetteDir)
 		go http.Serve(proxyListener, proxy)
 	})
 
@@ -108,9 +112,44 @@ var _ = Describe("Proxy", func() {
 		PIt("differentiates requests with different bodies", func() {})
 		PIt("differentiates requests with different methods", func() {})
 		PIt("differentiates requests with different headers", func() {})
-		PIt("records nothing without a current cassette", func() {})
+
+		It("records nothing without a current cassette", func() {
+			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(err).To(BeNil())
+			Expect(resp.StatusCode).To(Equal(200))
+			Expect(string(body)).To(Equal("hello, world"))
+
+			targetServer.Close()
+
+			resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+			Expect(err).To(BeNil())
+			Expect(resp.StatusCode).To(Equal(500))
+		})
+
 		PIt("denies unrecorded responses when the option is set", func() {})
-		PIt("write cassettes to disk", func() {})
+
+		It("write cassettes to disk", func() {
+			_, err := http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort), "text/json", bytes.NewBufferString("{\"cassette\": \"test-cassette\"}"))
+			Expect(err).To(BeNil())
+
+			http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+
+			cassetteData, err := ioutil.ReadFile(path.Join(cassetteDir, "test-cassette.json"))
+			Expect(err).To(BeNil())
+			Expect(cassetteData).ToNot(BeEmpty())
+
+			var cassetteJson []map[string]interface{}
+			err = json.Unmarshal(cassetteData, &cassetteJson)
+			Expect(err).To(BeNil())
+			Expect(cassetteJson).ToNot(BeEmpty())
+
+			episode := cassetteJson[0]
+			Expect(episode["Request"]).ToNot(BeEmpty())
+			Expect(episode["Response"]).ToNot(BeEmpty())
+
+		})
+
 		PIt("replays from cassettes on disk", func() {})
 	})
 
