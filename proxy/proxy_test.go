@@ -24,17 +24,25 @@ var _ = Describe("Proxy", func() {
 	var proxyListener net.Listener
 	var proxyPort string
 	var cassetteDir string
+	var requestCount int
 
 	BeforeEach(func() {
+		requestCount = 0
 		proxyListener, _ = net.Listen("tcp", "0.0.0.0:0")
 		_, proxyPort, _ = net.SplitHostPort(proxyListener.Addr().String())
 
 		targetServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			io.WriteString(writer, "hello, world")
+			requestCount++
+			if request.URL.Path == "/request-count" {
+				io.WriteString(writer, fmt.Sprintf("%d requests so far", requestCount))
+			} else {
+				io.WriteString(writer, "hello, world")
+			}
 		}))
 
 		targetUrl, _ := url.Parse(targetServer.URL)
 		cassetteDir = path.Join(os.TempDir(), "cassettes")
+		os.RemoveAll(cassetteDir)
 		proxy = Proxy(targetUrl, cassetteDir)
 		go http.Serve(proxyListener, proxy)
 	})
@@ -147,10 +155,30 @@ var _ = Describe("Proxy", func() {
 			episode := cassetteJson[0]
 			Expect(episode["Request"]).ToNot(BeEmpty())
 			Expect(episode["Response"]).ToNot(BeEmpty())
-
 		})
 
-		PIt("replays from cassettes on disk", func() {})
+		It("switches cassettes on demand", func() {
+			_, err := http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort), "text/json", bytes.NewBufferString("{\"cassette\": \"first-cassette\"}"))
+			Expect(err).To(BeNil())
+
+			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/request-count", proxyPort))
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+
+			_, err = http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort), "text/json", bytes.NewBufferString("{\"cassette\": \"second-cassette\"}"))
+			Expect(err).To(BeNil())
+
+			resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s/request-count", proxyPort))
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("2 requests so far"))
+
+			_, err = http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort), "text/json", bytes.NewBufferString("{\"cassette\": \"first-cassette\"}"))
+			Expect(err).To(BeNil())
+
+			resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s/request-count", proxyPort))
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+		})
 	})
 
 })
