@@ -26,6 +26,10 @@ var _ = Describe("Proxy", func() {
 	var cassetteDir string
 	var requestCount int
 
+	proxyGet := func(path string) (*http.Response, error) {
+		return http.Get(fmt.Sprintf("http://127.0.0.1:%s%s", proxyPort, path))
+	}
+
 	setCassette := func(cassetteName string) {
 		jsonString := fmt.Sprintf("{\"cassette\": \"%v\"}", cassetteName)
 		_, err := http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort),
@@ -61,7 +65,7 @@ var _ = Describe("Proxy", func() {
 	})
 
 	It("proxies without any configuration", func() {
-		resp, _ := http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+		resp, _ := proxyGet("/")
 		defer resp.Body.Close()
 
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -70,14 +74,14 @@ var _ = Describe("Proxy", func() {
 
 	It("returns a 500 if the target server is down", func() {
 		targetServer.Close()
-		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+		resp, err := proxyGet("/")
 		Expect(err).To(BeNil())
 		Expect(resp.StatusCode).To(Equal(500))
 	})
 
 	Context("allows configuration over http", func() {
 		It("returns the current configuration with a GET to /__betamax__/config", func() {
-			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort))
+			resp, err := proxyGet("/__betamax__/config")
 			Expect(err).To(BeNil())
 
 			var jsonResponse map[string]interface{}
@@ -91,7 +95,7 @@ var _ = Describe("Proxy", func() {
 		It("allows setting the current cassette via POST", func() {
 			setCassette("test-cassette")
 
-			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort))
+			resp, err := proxyGet("/__betamax__/config")
 			Expect(err).To(BeNil())
 
 			var jsonResponse map[string]interface{}
@@ -107,7 +111,7 @@ var _ = Describe("Proxy", func() {
 		It("replays GETs when a cassette is set", func() {
 			setCassette("test-cassette")
 
-			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+			resp, err := proxyGet("/")
 			body, _ := ioutil.ReadAll(resp.Body)
 			Expect(err).To(BeNil())
 			Expect(resp.StatusCode).To(Equal(200))
@@ -115,7 +119,7 @@ var _ = Describe("Proxy", func() {
 
 			targetServer.Close()
 
-			resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+			resp, err = proxyGet("/")
 			body, _ = ioutil.ReadAll(resp.Body)
 			Expect(err).To(BeNil())
 			Expect(resp.StatusCode).To(Equal(200))
@@ -128,7 +132,7 @@ var _ = Describe("Proxy", func() {
 		PIt("differentiates requests with different headers", func() {})
 
 		It("records nothing without a current cassette", func() {
-			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+			resp, err := proxyGet("/")
 			body, _ := ioutil.ReadAll(resp.Body)
 			Expect(err).To(BeNil())
 			Expect(resp.StatusCode).To(Equal(200))
@@ -136,7 +140,7 @@ var _ = Describe("Proxy", func() {
 
 			targetServer.Close()
 
-			resp, err = http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+			resp, err = proxyGet("/")
 			Expect(err).To(BeNil())
 			Expect(resp.StatusCode).To(Equal(500))
 		})
@@ -146,7 +150,7 @@ var _ = Describe("Proxy", func() {
 		It("write cassettes to disk", func() {
 			setCassette("test-cassette")
 
-			http.Get(fmt.Sprintf("http://127.0.0.1:%s", proxyPort))
+			proxyGet("/")
 
 			cassetteData, err := ioutil.ReadFile(path.Join(cassetteDir, "test-cassette.json"))
 			Expect(err).To(BeNil())
@@ -165,19 +169,19 @@ var _ = Describe("Proxy", func() {
 		It("switches cassettes on demand", func() {
 			setCassette("first-cassette")
 
-			resp, _ := http.Get(fmt.Sprintf("http://127.0.0.1:%s/request-count", proxyPort))
+			resp, _ := proxyGet("/request-count")
 			body, _ := ioutil.ReadAll(resp.Body)
 			Expect(string(body)).To(Equal("1 requests so far"))
 
 			setCassette("second-cassette")
 
-			resp, _ = http.Get(fmt.Sprintf("http://127.0.0.1:%s/request-count", proxyPort))
+			resp, _ = proxyGet("/request-count")
 			body, _ = ioutil.ReadAll(resp.Body)
 			Expect(string(body)).To(Equal("2 requests so far"))
 
 			setCassette("first-cassette")
 
-			resp, _ = http.Get(fmt.Sprintf("http://127.0.0.1:%s/request-count", proxyPort))
+			resp, _ = proxyGet("/request-count")
 			body, _ = ioutil.ReadAll(resp.Body)
 			Expect(string(body)).To(Equal("1 requests so far"))
 		})
