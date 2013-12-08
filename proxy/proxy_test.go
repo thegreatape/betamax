@@ -30,6 +30,10 @@ var _ = Describe("Proxy", func() {
 		return http.Get(fmt.Sprintf("http://127.0.0.1:%s%s", proxyPort, path))
 	}
 
+	proxyPost := func(path string, form url.Values) (*http.Response, error) {
+		return http.PostForm(fmt.Sprintf("http://127.0.0.1:%s%s", proxyPort, path), form)
+	}
+
 	setCassette := func(cassetteName string) {
 		jsonString := fmt.Sprintf("{\"cassette\": \"%v\"}", cassetteName)
 		_, err := http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort),
@@ -108,7 +112,7 @@ var _ = Describe("Proxy", func() {
 	})
 
 	Context("records and plays back proxied responses", func() {
-		It("replays GETs when a cassette is set", func() {
+		It("replays requests when a cassette is set", func() {
 			setCassette("test-cassette")
 
 			resp, err := proxyGet("/")
@@ -126,10 +130,33 @@ var _ = Describe("Proxy", func() {
 			Expect(string(body)).To(Equal("hello, world"))
 		})
 
-		PIt("replays POSTs when a cassette is set", func() {})
-		PIt("differentiates requests with different bodies", func() {})
+		It("differentiates requests with different bodies", func() {
+			setCassette("test-cassette")
+
+			formOne := url.Values{}
+			formOne.Add("Foo", "Bar")
+
+			formTwo := url.Values{}
+			formTwo.Add("Foo", "Bar")
+			formTwo.Add("Baz", "Quux")
+
+			resp, _ := proxyPost("/request-count", formOne)
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+
+			resp, _ = proxyPost("/request-count", formTwo)
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("2 requests so far"))
+
+			resp, _ = proxyPost("/request-count", formOne)
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+		})
+
 		PIt("differentiates requests with different methods", func() {})
 		PIt("differentiates requests with different headers", func() {})
+		PIt("differentiates requests with different query string", func() {})
+		PIt("differentiates requests with different anchor fragments", func() {})
 
 		It("records nothing without a current cassette", func() {
 			resp, err := proxyGet("/")
@@ -146,6 +173,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		PIt("denies unrecorded responses when the option is set", func() {})
+		PIt("does not record new episodes when the option is unset", func() {})
 
 		It("write cassettes to disk", func() {
 			setCassette("test-cassette")
