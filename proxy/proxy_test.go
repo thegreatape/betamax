@@ -153,10 +153,39 @@ var _ = Describe("Proxy", func() {
 			Expect(string(body)).To(Equal("1 requests so far"))
 		})
 
-		PIt("differentiates requests with different methods", func() {})
+		It("differentiates requests with different methods", func() {
+			setCassette("test-cassette")
+
+			resp, _ := proxyPost("/request-count", url.Values{})
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+
+			resp, _ = proxyGet("/request-count")
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("2 requests so far"))
+
+			resp, _ = proxyPost("/request-count", url.Values{})
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+		})
+
 		PIt("differentiates requests with different headers", func() {})
-		PIt("differentiates requests with different query string", func() {})
-		PIt("differentiates requests with different anchor fragments", func() {})
+
+		It("differentiates requests with different query string", func() {
+			setCassette("test-cassette")
+
+			resp, _ := proxyGet("/request-count?foo=bar")
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+
+			resp, _ = proxyGet("/request-count?foo=quux")
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("2 requests so far"))
+
+			resp, _ = proxyGet("/request-count?foo=bar")
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+		})
 
 		It("records nothing without a current cassette", func() {
 			resp, err := proxyGet("/")
