@@ -6,79 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
-	"path"
 )
-
-type Config struct {
-	CassetteDir string
-	Cassette    string `json:"cassette"`
-	Episodes    []Episode
-}
-
-func (c *Config) Load() error {
-	c.Episodes = []Episode{}
-
-	cassetteData, err := ioutil.ReadFile(path.Join(c.CassetteDir, c.Cassette+".json"))
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(cassetteData, &c.Episodes)
-}
-
-func (c *Config) Save() error {
-	jsonData, err := json.Marshal(&c.Episodes)
-	if err != nil {
-		return err
-	}
-	os.MkdirAll(c.CassetteDir, 0700)
-	return ioutil.WriteFile(path.Join(c.CassetteDir, c.Cassette+".json"), jsonData, 0700)
-}
-
-type Cassette struct {
-	Name     string
-	Episodes []Episode
-}
-
-type Episode struct {
-	Request  RecordedRequest
-	Response RecordedResponse
-}
-
-type RecordedRequest struct {
-	Method string
-	URL    *url.URL
-	Header http.Header
-	Body   []byte
-}
-
-type RecordedResponse struct {
-	StatusCode int
-	Body       []byte
-	Header     http.Header
-}
-
-type ProxyResponseWriter struct {
-	Writer   http.ResponseWriter
-	Response RecordedResponse
-}
-
-func (p *ProxyResponseWriter) Header() http.Header {
-	return p.Writer.Header()
-}
-
-func (p *ProxyResponseWriter) Write(bytes []byte) (int, error) {
-	p.Response.Body = append(p.Response.Body, bytes...)
-	return p.Writer.Write(bytes)
-}
-
-func (p *ProxyResponseWriter) WriteHeader(statusCode int) {
-	// according to docs, once WriteHeader is called, further modifications to Header have
-	// no effect; hence, we can copy it here.
-	p.Response.Header = p.Writer.Header()
-	p.Response.StatusCode = statusCode
-	p.Writer.WriteHeader(statusCode)
-}
 
 func handleConfigRequest(resp http.ResponseWriter, req *http.Request, config *Config) {
 	if req.Method == "GET" {
