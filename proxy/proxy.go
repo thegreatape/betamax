@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -42,6 +43,16 @@ func cassetteHandler(handler http.Handler, config *Config) http.Handler {
 	})
 }
 
+// reads all bytes of the request into memory
+// returns the read bytes and replaces the request's Reader
+// with a refilled reader. seems like there should be a better
+// way to do this.
+func peekBytes(req *http.Request) (body []byte, err error) {
+	body, err = ioutil.ReadAll(req.Body)
+	req.Body = ioutil.NopCloser(bytes.NewReader(body))
+	return
+}
+
 func sameURL(a *url.URL, b *url.URL) bool {
 	return a.Path == b.Path && a.RawQuery == b.RawQuery && a.Fragment == b.Fragment
 }
@@ -55,21 +66,24 @@ func sameRequest(a *RecordedRequest, b *http.Request) bool {
 		return false
 	}
 
-	//if a.Body != b.Body {
-	//return false
-	//}
+	body, _ := peekBytes(b)
+	if bytes.Compare(a.Body, body) != 0 {
+		return false
+	}
 
 	return true
 }
 
 func serveAndRecord(resp http.ResponseWriter, req *http.Request, handler http.Handler, config *Config) {
 	proxyWriter := ProxyResponseWriter{Writer: resp}
+	recordedRequest := recordRequest(req)
+
 	handler.ServeHTTP(&proxyWriter, req)
-	writeEpisode(Episode{Request: recordRequest(req), Response: proxyWriter.Response}, config)
+	writeEpisode(Episode{Request: recordedRequest, Response: proxyWriter.Response}, config)
 }
 
 func recordRequest(req *http.Request) RecordedRequest {
-	body, _ := ioutil.ReadAll(req.Body)
+	body, _ := peekBytes(req)
 	return RecordedRequest{
 		URL:    req.URL,
 		Header: req.Header,
@@ -93,7 +107,6 @@ func findEpisode(req *http.Request, config *Config) *Episode {
 }
 
 func serveEpisode(episode *Episode, resp http.ResponseWriter) {
-
 	for k, values := range episode.Response.Header {
 		for _, value := range values {
 			resp.Header().Add(k, value)
