@@ -44,11 +44,13 @@ var _ = Describe("Proxy", func() {
 		return http.PostForm(fmt.Sprintf("http://127.0.0.1:%s%s", proxyPort, path), form)
 	}
 
-	setCassette := func(cassetteName string) {
-		jsonString := fmt.Sprintf("{\"cassette\": \"%v\"}", cassetteName)
-		_, err := http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort),
+	configureProxy := func(options map[string]interface{}) {
+		jsonBytes, err := json.Marshal(options)
+		Expect(err).To(BeNil())
+
+		_, err = http.Post(fmt.Sprintf("http://127.0.0.1:%s/__betamax__/config", proxyPort),
 			"text/json",
-			bytes.NewBufferString(jsonString))
+			bytes.NewBuffer(jsonBytes))
 		Expect(err).To(BeNil())
 	}
 
@@ -107,7 +109,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("allows setting the current cassette via POST", func() {
-			setCassette("test-cassette")
+			configureProxy(map[string]interface{}{"cassette": "test-cassette"})
 
 			resp, err := proxyGet("/__betamax__/config")
 			Expect(err).To(BeNil())
@@ -123,7 +125,7 @@ var _ = Describe("Proxy", func() {
 
 	Context("records and plays back proxied responses", func() {
 		It("replays requests when a cassette is set", func() {
-			setCassette("test-cassette")
+			configureProxy(map[string]interface{}{"cassette": "test-cassette"})
 
 			resp, err := proxyGet("/")
 			body, _ := ioutil.ReadAll(resp.Body)
@@ -141,7 +143,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("differentiates requests with different bodies", func() {
-			setCassette("test-cassette")
+			configureProxy(map[string]interface{}{"cassette": "test-cassette"})
 
 			formOne := url.Values{}
 			formOne.Add("Foo", "Bar")
@@ -164,7 +166,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("differentiates requests with different methods", func() {
-			setCassette("test-cassette")
+			configureProxy(map[string]interface{}{"cassette": "test-cassette"})
 
 			resp, _ := proxyPost("/request-count", url.Values{})
 			body, _ := ioutil.ReadAll(resp.Body)
@@ -180,7 +182,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("differentiates requests with different headers", func() {
-			setCassette("test-cassette")
+			configureProxy(map[string]interface{}{"cassette": "test-cassette"})
 
 			resp, _ := proxyGetWithHeaders("/request-count", map[string]string{"Content-Type": "text/json"})
 			body, _ := ioutil.ReadAll(resp.Body)
@@ -196,7 +198,7 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("differentiates requests with different query string", func() {
-			setCassette("test-cassette")
+			configureProxy(map[string]interface{}{"cassette": "test-cassette"})
 
 			resp, _ := proxyGet("/request-count?foo=bar")
 			body, _ := ioutil.ReadAll(resp.Body)
@@ -226,10 +228,21 @@ var _ = Describe("Proxy", func() {
 		})
 
 		PIt("denies unrecorded responses when the option is set", func() {})
-		PIt("does not record new episodes when the option is unset", func() {})
+
+		It("does not record new episodes when the option is unset", func() {
+			configureProxy(map[string]interface{}{"cassette": "test-cassette", "record": false})
+
+			resp, _ := proxyGet("/request-count")
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+
+			resp, _ = proxyGet("/request-count")
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("2 requests so far"))
+		})
 
 		It("write cassettes to disk", func() {
-			setCassette("test-cassette")
+			configureProxy(map[string]interface{}{"cassette": "test-cassette"})
 
 			proxyGet("/")
 
@@ -248,19 +261,19 @@ var _ = Describe("Proxy", func() {
 		})
 
 		It("switches cassettes on demand", func() {
-			setCassette("first-cassette")
+			configureProxy(map[string]interface{}{"cassette": "first-cassette"})
 
 			resp, _ := proxyGet("/request-count")
 			body, _ := ioutil.ReadAll(resp.Body)
 			Expect(string(body)).To(Equal("1 requests so far"))
 
-			setCassette("second-cassette")
+			configureProxy(map[string]interface{}{"cassette": "second-cassette"})
 
 			resp, _ = proxyGet("/request-count")
 			body, _ = ioutil.ReadAll(resp.Body)
 			Expect(string(body)).To(Equal("2 requests so far"))
 
-			setCassette("first-cassette")
+			configureProxy(map[string]interface{}{"cassette": "first-cassette"})
 
 			resp, _ = proxyGet("/request-count")
 			body, _ = ioutil.ReadAll(resp.Body)

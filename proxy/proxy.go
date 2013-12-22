@@ -35,7 +35,7 @@ func cassetteHandler(handler http.Handler, config *Config) http.Handler {
 			return
 		}
 
-		if episode := findEpisode(req, config); episode != nil {
+		if episode := findEpisode(req, config); config.Record && episode != nil {
 			serveEpisode(episode, resp)
 		} else {
 			serveAndRecord(resp, req, handler, config)
@@ -147,7 +147,7 @@ func serveEpisode(episode *Episode, resp http.ResponseWriter) {
 }
 
 func Proxy(target *url.URL, cassetteDir string) http.Handler {
-	config := &Config{CassetteDir: cassetteDir}
+	config := &Config{CassetteDir: cassetteDir, Record: true}
 	cassetteHandler := cassetteHandler(httputil.NewSingleHostReverseProxy(target), config)
 	return configHandler(cassetteHandler, config)
 }

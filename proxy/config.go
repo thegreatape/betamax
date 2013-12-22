@@ -11,6 +11,7 @@ type Config struct {
 	CassetteDir string
 	Cassette    string `json:"cassette"`
 	Episodes    []Episode
+	Record      bool `json:"record"`
 }
 
 func (c *Config) Load() error {
