@@ -227,10 +227,18 @@ var _ = Describe("Proxy", func() {
 			Expect(resp.StatusCode).To(Equal(500))
 		})
 
-		PIt("denies unrecorded responses when the option is set", func() {})
+		It("denies unrecorded responses when the option is set", func() {
+			configureProxy(map[string]interface{}{"cassette": "test-cassette", "deny_unrecorded_requests": true})
+
+			resp, _ := proxyGet("/request-count")
+			Expect(resp.StatusCode).To(Equal(403))
+
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal(""))
+		})
 
 		It("does not record new episodes when the option is unset", func() {
-			configureProxy(map[string]interface{}{"cassette": "test-cassette", "record": false})
+			configureProxy(map[string]interface{}{"cassette": "test-cassette", "record_new_episodes": false})
 
 			resp, _ := proxyGet("/request-count")
 			body, _ := ioutil.ReadAll(resp.Body)

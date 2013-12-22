@@ -8,10 +8,11 @@ import (
 )
 
 type Config struct {
-	CassetteDir string
-	Cassette    string `json:"cassette"`
-	Episodes    []Episode
-	Record      bool `json:"record"`
+	CassetteDir            string
+	Cassette               string `json:"cassette"`
+	Episodes               []Episode
+	RecordNewEpisodes      bool `json:"record_new_episodes"`
+	DenyUnrecordedRequests bool `json:"deny_unrecorded_requests"`
 }
 
 func (c *Config) Load() error {

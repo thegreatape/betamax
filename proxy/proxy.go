@@ -35,10 +35,14 @@ func cassetteHandler(handler http.Handler, config *Config) http.Handler {
 			return
 		}
 
-		if episode := findEpisode(req, config); config.Record && episode != nil {
+		if episode := findEpisode(req, config); config.RecordNewEpisodes && episode != nil {
 			serveEpisode(episode, resp)
 		} else {
-			serveAndRecord(resp, req, handler, config)
+			if !config.DenyUnrecordedRequests {
+				serveAndRecord(resp, req, handler, config)
+			} else {
+				resp.WriteHeader(403)
+			}
 		}
 	})
 }
@@ -147,7 +151,7 @@ func serveEpisode(episode *Episode, resp http.ResponseWriter) {
 }
 
 func Proxy(target *url.URL, cassetteDir string) http.Handler {
-	config := &Config{CassetteDir: cassetteDir, Record: true}
+	config := &Config{CassetteDir: cassetteDir, RecordNewEpisodes: true}
 	cassetteHandler := cassetteHandler(httputil.NewSingleHostReverseProxy(target), config)
 	return configHandler(cassetteHandler, config)
 }
