@@ -57,12 +57,42 @@ func sameURL(a *url.URL, b *url.URL) bool {
 	return a.Path == b.Path && a.RawQuery == b.RawQuery && a.Fragment == b.Fragment
 }
 
+func sameHeaders(recorded, newRequest http.Header) bool {
+	// proxy tacks on an extra X-Forwarded-For
+	if len(recorded)-1 != len(newRequest) {
+		return false
+	}
+
+	for key, newValue := range newRequest {
+		recordedValue, present := recorded[key]
+		if !present {
+			return false
+		}
+
+		if len(newValue) != len(recordedValue) {
+			return false
+		}
+
+		for i, _ := range newValue {
+			if newValue[i] != recordedValue[i] {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 func sameRequest(a *RecordedRequest, b *http.Request) bool {
 	if a.Method != b.Method {
 		return false
 	}
 
 	if !sameURL(a.URL, b.URL) {
+		return false
+	}
+
+	if !sameHeaders(a.Header, b.Header) {
 		return false
 	}
 

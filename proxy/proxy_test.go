@@ -26,6 +26,16 @@ var _ = Describe("Proxy", func() {
 	var cassetteDir string
 	var requestCount int
 
+	proxyGetWithHeaders := func(path string, headers map[string]string) (*http.Response, error) {
+		client := new(http.Client)
+		req, _ := http.NewRequest("GET", fmt.Sprintf("http://127.0.0.1:%s%s", proxyPort, path), nil)
+		for key, value := range headers {
+			req.Header.Add(key, value)
+		}
+
+		return client.Do(req)
+	}
+
 	proxyGet := func(path string) (*http.Response, error) {
 		return http.Get(fmt.Sprintf("http://127.0.0.1:%s%s", proxyPort, path))
 	}
@@ -169,7 +179,21 @@ var _ = Describe("Proxy", func() {
 			Expect(string(body)).To(Equal("1 requests so far"))
 		})
 
-		PIt("differentiates requests with different headers", func() {})
+		It("differentiates requests with different headers", func() {
+			setCassette("test-cassette")
+
+			resp, _ := proxyGetWithHeaders("/request-count", map[string]string{"Content-Type": "text/json"})
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+
+			resp, _ = proxyGetWithHeaders("/request-count", map[string]string{"Content-Type": "text/html"})
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("2 requests so far"))
+
+			resp, _ = proxyGetWithHeaders("/request-count", map[string]string{"Content-Type": "text/json"})
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+		})
 
 		It("differentiates requests with different query string", func() {
 			setCassette("test-cassette")
