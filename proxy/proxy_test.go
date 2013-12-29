@@ -23,6 +23,7 @@ var _ = Describe("Proxy", func() {
 
 	var proxyListener net.Listener
 	var proxyPort string
+	var targetUrl *url.URL
 	var cassetteDir string
 	var requestCount int
 
@@ -63,12 +64,14 @@ var _ = Describe("Proxy", func() {
 			requestCount++
 			if request.URL.Path == "/request-count" {
 				io.WriteString(writer, fmt.Sprintf("%d requests so far", requestCount))
+			} else if request.URL.Path == "/echo-host" {
+				io.WriteString(writer, request.Host)
 			} else {
 				io.WriteString(writer, "hello, world")
 			}
 		}))
 
-		targetUrl, _ := url.Parse(targetServer.URL)
+		targetUrl, _ = url.Parse(targetServer.URL)
 		cassetteDir = path.Join(os.TempDir(), "cassettes")
 		os.RemoveAll(cassetteDir)
 		proxy = Proxy(targetUrl, cassetteDir)
@@ -286,6 +289,18 @@ var _ = Describe("Proxy", func() {
 			resp, _ = proxyGet("/request-count")
 			body, _ = ioutil.ReadAll(resp.Body)
 			Expect(string(body)).To(Equal("1 requests so far"))
+		})
+
+		It("rewrites the Host header by default to the target's host", func() {
+			resp, _ := proxyGet("/echo-host")
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal(targetUrl.Host))
+
+			configureProxy(map[string]interface{}{"rewrite_host_header": false})
+
+			resp, _ = proxyGet("/echo-host")
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal(fmt.Sprintf("127.0.0.1:%s", proxyPort)))
 		})
 	})
 

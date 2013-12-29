@@ -47,6 +47,16 @@ func cassetteHandler(handler http.Handler, config *Config) http.Handler {
 	})
 }
 
+func rewriteHeaderHandler(handler http.Handler, config *Config) http.Handler {
+	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		if config.RewriteHostHeader {
+			req.Host = config.TargetHost
+		}
+
+		handler.ServeHTTP(resp, req)
+	})
+}
+
 // reads all bytes of the request into memory
 // returns the read bytes and replaces the request's Reader
 // with a refilled reader. seems like there should be a better
@@ -151,7 +161,8 @@ func serveEpisode(episode *Episode, resp http.ResponseWriter) {
 }
 
 func Proxy(target *url.URL, cassetteDir string) http.Handler {
-	config := &Config{CassetteDir: cassetteDir, RecordNewEpisodes: true}
+	config := &Config{CassetteDir: cassetteDir, RecordNewEpisodes: true, RewriteHostHeader: true, TargetHost: target.Host}
 	cassetteHandler := cassetteHandler(httputil.NewSingleHostReverseProxy(target), config)
-	return configHandler(cassetteHandler, config)
+	rewriteHeaderHandler := rewriteHeaderHandler(cassetteHandler, config)
+	return configHandler(rewriteHeaderHandler, config)
 }

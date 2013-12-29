@@ -8,11 +8,13 @@ import (
 )
 
 type Config struct {
+	TargetHost             string
 	CassetteDir            string
 	Cassette               string `json:"cassette"`
 	Episodes               []Episode
 	RecordNewEpisodes      bool `json:"record_new_episodes"`
 	DenyUnrecordedRequests bool `json:"deny_unrecorded_requests"`
+	RewriteHostHeader      bool `json:"rewrite_host_header"`
 }
 
 func (c *Config) Load() error {
