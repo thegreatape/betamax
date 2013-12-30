@@ -10,11 +10,12 @@ import (
 type Config struct {
 	TargetHost             string
 	CassetteDir            string
-	Cassette               string `json:"cassette"`
 	Episodes               []Episode
-	RecordNewEpisodes      bool `json:"record_new_episodes"`
-	DenyUnrecordedRequests bool `json:"deny_unrecorded_requests"`
-	RewriteHostHeader      bool `json:"rewrite_host_header"`
+	Cassette               string   `json:"cassette"`
+	RecordNewEpisodes      bool     `json:"record_new_episodes"`
+	DenyUnrecordedRequests bool     `json:"deny_unrecorded_requests"`
+	RewriteHostHeader      bool     `json:"rewrite_host_header"`
+	MatchHeaders           []string `json:"match_headers"`
 }
 
 func (c *Config) Load() error {

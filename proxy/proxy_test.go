@@ -184,7 +184,7 @@ var _ = Describe("Proxy", func() {
 			Expect(string(body)).To(Equal("1 requests so far"))
 		})
 
-		It("differentiates requests with different headers", func() {
+		It("differentiates requests with different headers when configured to match them", func() {
 			configureProxy(map[string]interface{}{"cassette": "test-cassette"})
 
 			resp, _ := proxyGetWithHeaders("/request-count", map[string]string{"Content-Type": "text/json"})
@@ -193,11 +193,13 @@ var _ = Describe("Proxy", func() {
 
 			resp, _ = proxyGetWithHeaders("/request-count", map[string]string{"Content-Type": "text/html"})
 			body, _ = ioutil.ReadAll(resp.Body)
-			Expect(string(body)).To(Equal("2 requests so far"))
-
-			resp, _ = proxyGetWithHeaders("/request-count", map[string]string{"Content-Type": "text/json"})
-			body, _ = ioutil.ReadAll(resp.Body)
 			Expect(string(body)).To(Equal("1 requests so far"))
+
+			configureProxy(map[string]interface{}{"match_headers": []string{"Content-Type"}})
+
+			resp, _ = proxyGetWithHeaders("/request-count", map[string]string{"Content-Type": "text/sharks"})
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("2 requests so far"))
 		})
 
 		It("differentiates requests with different query string", func() {

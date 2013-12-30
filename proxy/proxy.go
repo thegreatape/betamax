@@ -71,33 +71,22 @@ func sameURL(a *url.URL, b *url.URL) bool {
 	return a.Path == b.Path && a.RawQuery == b.RawQuery && a.Fragment == b.Fragment
 }
 
-func sameHeaders(recorded, newRequest http.Header) bool {
-	// proxy tacks on an extra X-Forwarded-For
-	if len(recorded)-1 != len(newRequest) {
-		return false
-	}
+func sameHeaders(recorded http.Header, newRequest http.Header, config Config) bool {
+	for _, header := range config.MatchHeaders {
+		for i, _ := range newRequest[header] {
+			if len(newRequest[header]) != len(recorded[header]) {
+				return false
+			}
 
-	for key, newValue := range newRequest {
-		recordedValue, present := recorded[key]
-		if !present {
-			return false
-		}
-
-		if len(newValue) != len(recordedValue) {
-			return false
-		}
-
-		for i, _ := range newValue {
-			if newValue[i] != recordedValue[i] {
+			if newRequest[header][i] != recorded[header][i] {
 				return false
 			}
 		}
 	}
-
 	return true
 }
 
-func sameRequest(a *RecordedRequest, b *http.Request) bool {
+func sameRequest(a *RecordedRequest, b *http.Request, config Config) bool {
 	if a.Method != b.Method {
 		return false
 	}
@@ -106,7 +95,7 @@ func sameRequest(a *RecordedRequest, b *http.Request) bool {
 		return false
 	}
 
-	if !sameHeaders(a.Header, b.Header) {
+	if !sameHeaders(a.Header, b.Header, config) {
 		return false
 	}
 
@@ -143,7 +132,7 @@ func writeEpisode(episode Episode, config *Config) {
 
 func findEpisode(req *http.Request, config *Config) *Episode {
 	for _, episode := range config.Episodes {
-		if sameRequest(&episode.Request, req) {
+		if sameRequest(&episode.Request, req, *config) {
 			return &episode
 		}
 	}
