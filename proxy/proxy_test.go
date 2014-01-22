@@ -9,6 +9,7 @@ import (
 	. "github.com/thegreatape/betamax/proxy"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -43,6 +44,47 @@ var _ = Describe("Proxy", func() {
 
 	proxyPost := func(path string, form url.Values) (*http.Response, error) {
 		return http.PostForm(fmt.Sprintf("http://127.0.0.1:%s%s", proxyPort, path), form)
+	}
+
+	proxyPostMultipart := func(path string, form map[string][]string) (*http.Response, error) {
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+
+		for key, values := range form {
+			for _, value := range values {
+				formWriter, err := writer.CreateFormField(key)
+				if err != nil {
+					return nil, err
+				}
+
+				_, err = formWriter.Write([]byte(value))
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+		writer.Close()
+
+		// Now that you have a form, you can submit it to your handler.
+		req, err := http.NewRequest("POST", fmt.Sprintf("http://127.0.0.1:%s%s", proxyPort, path), &buf)
+		if err != nil {
+			return nil, err
+		}
+		// Don't forget to set the content type, this will contain the boundary.
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		// Submit the request
+		client := &http.Client{}
+		res, err := client.Do(req)
+		if err != nil {
+			return res, err
+		}
+
+		// Check the response
+		if res.StatusCode != http.StatusOK {
+			err = fmt.Errorf("bad status: %s", res.Status)
+		}
+		return res, err
 	}
 
 	configureProxy := func(options map[string]interface{}) {
@@ -303,6 +345,22 @@ var _ = Describe("Proxy", func() {
 			resp, _ = proxyGet("/echo-host")
 			body, _ = ioutil.ReadAll(resp.Body)
 			Expect(string(body)).To(Equal(fmt.Sprintf("127.0.0.1:%s", proxyPort)))
+		})
+
+		It("ignores the content-boundary multipart forms", func() {
+			configureProxy(map[string]interface{}{"cassette": "test-cassette"})
+
+			resp, _ := proxyPostMultipart("/request-count", map[string][]string{"Foo": []string{"Bar"}})
+			body, _ := ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+
+			resp, _ = proxyPostMultipart("/request-count", map[string][]string{"Foo": []string{"Bar"}})
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("1 requests so far"))
+
+			resp, _ = proxyPostMultipart("/request-count", map[string][]string{"Foo": []string{"Baz"}})
+			body, _ = ioutil.ReadAll(resp.Body)
+			Expect(string(body)).To(Equal("2 requests so far"))
 		})
 	})
 

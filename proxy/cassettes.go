@@ -20,6 +20,7 @@ type RecordedRequest struct {
 	URL    *url.URL
 	Header http.Header
 	Body   []byte
+	Form   map[string][]string
 }
 
 type RecordedResponse struct {

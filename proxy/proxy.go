@@ -67,6 +67,16 @@ func peekBytes(req *http.Request) (body []byte, err error) {
 	return
 }
 
+func peekForm(req *http.Request) (form url.Values, err error) {
+	body, err := ioutil.ReadAll(req.Body)
+	req.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+	err = req.ParseMultipartForm(10000)
+	form = req.Form
+	req.Body = ioutil.NopCloser(bytes.NewReader(body))
+	return
+}
+
 func sameURL(a *url.URL, b *url.URL) bool {
 	return a.Path == b.Path && a.RawQuery == b.RawQuery && a.Fragment == b.Fragment
 }
@@ -99,9 +109,25 @@ func sameRequest(a *RecordedRequest, b *http.Request, config Config) bool {
 		return false
 	}
 
-	body, _ := peekBytes(b)
-	if bytes.Compare(a.Body, body) != 0 {
-		return false
+	form, _ := peekForm(b)
+
+	for key, _ := range form {
+		if len(a.Form[key]) != len(form[key]) {
+			return false
+		}
+
+		for i, _ := range form[key] {
+			if a.Form[key][i] != form[key][i] {
+				return false
+			}
+		}
+	}
+
+	if len(form) == 0 {
+		body, _ := peekBytes(b)
+		if bytes.Compare(a.Body, body) != 0 {
+			return false
+		}
 	}
 
 	return true
@@ -117,11 +143,13 @@ func serveAndRecord(resp http.ResponseWriter, req *http.Request, handler http.Ha
 
 func recordRequest(req *http.Request) RecordedRequest {
 	body, _ := peekBytes(req)
+	form, _ := peekForm(req)
 	return RecordedRequest{
 		URL:    req.URL,
 		Header: req.Header,
 		Method: req.Method,
 		Body:   body,
+		Form:   form,
 	}
 }
 
@@ -151,6 +179,7 @@ func serveEpisode(episode *Episode, resp http.ResponseWriter) {
 
 func Proxy(target *url.URL, cassetteDir string) http.Handler {
 	config := &Config{CassetteDir: cassetteDir, RecordNewEpisodes: true, RewriteHostHeader: true, TargetHost: target.Host}
+
 	cassetteHandler := cassetteHandler(httputil.NewSingleHostReverseProxy(target), config)
 	rewriteHeaderHandler := rewriteHeaderHandler(cassetteHandler, config)
 	return configHandler(rewriteHeaderHandler, config)
