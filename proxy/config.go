@@ -29,7 +29,7 @@ func (c *Config) Load() error {
 }
 
 func (c *Config) Save() error {
-	jsonData, err := json.Marshal(&c.Episodes)
+	jsonData, err := json.MarshalIndent(&c.Episodes, "", "  ")
 	if err != nil {
 		return err
 	}
