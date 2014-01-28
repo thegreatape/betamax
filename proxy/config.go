@@ -44,17 +44,17 @@ type WriteableRecordedResponse struct {
 	Header     http.Header
 }
 
-func isText(headers http.Header) bool {
+func IsText(headers http.Header) bool {
 	contentType := headers["Content-Type"]
 	if contentType == nil {
 		return false
 	}
-	matched, _ := regexp.Match("^text/", []byte(contentType[0]))
+	matched, _ := regexp.Match("^(text/)|(json)", []byte(contentType[0]))
 	return matched
 }
 
 func writableBodyForContentType(body []byte, headers http.Header) interface{} {
-	if isText(headers) {
+	if IsText(headers) {
 		return string(body)
 	} else {
 		return body
@@ -62,7 +62,7 @@ func writableBodyForContentType(body []byte, headers http.Header) interface{} {
 }
 
 func bodyForContentType(body interface{}, headers http.Header) []byte {
-	if isText(headers) {
+	if IsText(headers) {
 		return []byte(body.(string))
 	} else {
 		str, _ := base64.StdEncoding.DecodeString(body.(string))

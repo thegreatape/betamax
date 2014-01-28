@@ -73,4 +73,10 @@ var _ = Describe("Config", func() {
 		Expect(cassetteJSON).To(MatchRegexp(`"Body": "Z29vZGJ5ZSE="`))
 	})
 
+	It("knows which content types are plain text", func() {
+		Expect(IsText(map[string][]string{"Content-Type": []string{"text/json"}})).To(BeTrue())
+		Expect(IsText(map[string][]string{"Content-Type": []string{"image/jpg"}})).To(BeFalse())
+		Expect(IsText(map[string][]string{"Content-Type": []string{"application/json"}})).To(BeTrue())
+	})
+
 })
